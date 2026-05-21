@@ -1,0 +1,58 @@
+// Prisma schema for Insta Analyzer
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String?
+  createdAt         DateTime  @default(now())
+  analyses          Analysis[]
+  imageGenerations  ImageGeneration[]
+  uploadedDocuments UploadedDocument[]
+  chatMessages      ChatMessage[]
+}
+
+model Analysis {
+  id                 String   @id @default(cuid())
+  instagramUsername  String
+  sentimentGlobal    String
+  frustrations       Json
+  besoinsClients     Json
+  opportunitesBusiness Json
+  createdAt          DateTime @default(now())
+  userId             String?
+  user               User?    @relation(fields: [userId], references: [id])
+}
+
+model ImageGeneration {
+  id         String   @id @default(cuid())
+  prompt     String
+  imageBase64 String
+  createdAt  DateTime @default(now())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+}
+
+model UploadedDocument {
+  id        String   @id @default(cuid())
+  fileName  String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  createdAt DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+}
