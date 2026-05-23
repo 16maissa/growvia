@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BarChart3, History, Settings, Camera, Image, FileUp, MessageSquare } from "lucide-react";
+import { LayoutDashboard, BarChart3, History, Settings, Camera, Image, FileUp, MessageSquare, BrainCircuit, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Studio AI", href: "/studio/image", icon: Image },
+  { name: "Quiz Generator", href: "/quiz", icon: BrainCircuit },
+  { name: "Curriculum Builder", href: "/curriculum", icon: GraduationCap },
   { name: "Upload PDF", href: "/pdf-upload", icon: FileUp },
   { name: "PDF Chat", href: "/pdf-chat", icon: MessageSquare },
   { name: "History", href: "/history", icon: History },

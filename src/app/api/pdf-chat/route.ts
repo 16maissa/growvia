@@ -20,16 +20,19 @@ export async function POST(req: NextRequest) {
     });
 
     let finalQuestionToSend = question;
-    const isYes = question.toLowerCase().trim() === "oui" || question.toLowerCase().trim() === "yes";
+    const isYes = /\b(oui|yes|y|ouais|go ahead|ok|okey|d'accord|sure|do it)\b/i.test(question.trim());
 
-    if (
-      lastMessages.length === 2 &&
-      lastMessages[0].answer.includes("connaissances générales") &&
-      isYes
-    ) {
-      // The user agreed to use general knowledge for the PREVIOUS question
+    if (lastMessages.length === 2 && isYes) {
+      const previousAnswer = lastMessages[0].answer.toLowerCase();
       const previousQuestion = lastMessages[1].question;
-      finalQuestionToSend = `SYSTEM INSTRUCTION: Ignore the PDF completely. Answer this question using your general LLM knowledge: ${previousQuestion}`;
+
+      if (previousAnswer.includes("search across all other documents") || previousAnswer.includes("tous les autres documents")) {
+        // Rebound 1: Search across all documents
+        finalQuestionToSend = `SYSTEM INSTRUCTION: Search across ALL documents in the database to answer this question: ${previousQuestion}`;
+      } else if (previousAnswer.includes("general ai knowledge") || previousAnswer.includes("connaissances générales") || previousAnswer.includes("general knowledge")) {
+        // Rebound 2: Use general knowledge
+        finalQuestionToSend = `SYSTEM INSTRUCTION: Ignore the PDF completely. Answer this question using your general LLM knowledge: ${previousQuestion}`;
+      }
     }
 
     const webhookUrl = process.env.N8N_PDF_CHAT_WEBHOOK_URL || "http://localhost:5678/webhook/pdf-agent";
@@ -54,16 +57,20 @@ export async function POST(req: NextRequest) {
     if (n8nRawText.trim() === "") {
       console.log("=== [INFO] n8n a renvoyé un corps vide. ===");
       n8nData = { 
-        success: true, 
-        answer: "Je n'ai pas pu trouver cette information dans le PDF. Voulez-vous que je réponde avec mes connaissances générales ?" 
+        success: false, 
+        answer: isYes 
+          ? "[Erreur Système] Je n'ai pas pu générer la réponse. La limite de requêtes (tokens) a probablement été atteinte sur votre compte Gemini, ou n8n a planté." 
+          : "I couldn't find this information in your uploaded documents. Would you like me to answer using my general AI knowledge instead?" 
       };
     } else {
       try {
         n8nData = JSON.parse(n8nRawText);
       } catch (e) {
         n8nData = { 
-          success: true, 
-          answer: "Je n'ai pas pu trouver cette information dans le PDF. Voulez-vous que je réponde avec mes connaissances générales ?" 
+          success: false, 
+          answer: isYes 
+            ? "[Erreur Système] Je n'ai pas pu générer la réponse. La limite de requêtes (tokens) a probablement été atteinte sur votre compte Gemini, ou n8n a planté." 
+            : "I couldn't find this information in your uploaded documents. Would you like me to answer using my general AI knowledge instead?" 
         };
       }
     }
@@ -72,7 +79,9 @@ export async function POST(req: NextRequest) {
 
     // If n8n returns an error or a generic "I don't know" from Langchain
     if (!answer || answer.toLowerCase().includes("i don't know") || answer.toLowerCase().includes("not provided")) {
-      answer = "Je n'ai pas pu trouver cette information dans le PDF. Voulez-vous que je réponde avec mes connaissances générales ?";
+      answer = isYes 
+        ? "[Erreur Système] Impossible de répondre. La limite de requêtes (tokens) a probablement été atteinte sur votre compte Gemini."
+        : "I couldn't find this information in your uploaded documents. Would you like me to answer using my general AI knowledge instead?";
     }
 
     // Store the chat exchange in the database
