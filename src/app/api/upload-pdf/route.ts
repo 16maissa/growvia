@@ -15,6 +15,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Prevent duplicate file uploads
+    const existingDoc = await prisma.uploadedDocument.findFirst({
+      where: { fileName: file.name }
+    });
+
+    if (existingDoc) {
+      return NextResponse.json(
+        { error: "Ce document existe déjà dans votre bibliothèque." },
+        { status: 400 }
+      );
+    }
+
     // Convert File to a standard Blob to ensure fetch serializes it as binary properly
     const arrayBuffer = await file.arrayBuffer();
     const blob = new Blob([arrayBuffer], { type: file.type || "application/pdf" });

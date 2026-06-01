@@ -1,158 +1,73 @@
-import { KpiCard } from "@/components/dashboard/kpi-card";
-import { SentimentChart } from "@/components/dashboard/sentiment-chart";
+import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Activity, Smile, Frown, Meh, Hash } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { redirect } from "next/navigation";
+import { AuditDashboard } from "@/components/audit/audit-dashboard";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import Link from "next/link";
+import { Activity } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const analyses = await prisma.analysis.findMany({
-    orderBy: { createdAt: 'desc' }
+  const session = await getSession();
+  if (!session?.userId) redirect("/sign-in");
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    include: {
+      userProfile: true,
+      automationPrefs: true,
+      audits: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        include: { actionPlans: { orderBy: { week_number: "asc" } } }
+      },
+      agentTasks: {
+        where: {
+          scheduled_at: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0)),
+            lt: new Date(new Date().setHours(23, 59, 59, 999)),
+          }
+        },
+        orderBy: { scheduled_at: "asc" }
+      },
+      generatedContents: {
+        where: { status: "draft" },
+        include: { agentTask: true }
+      }
+    }
   });
 
-  // @ts-ignore - L'erreur rouge est due au cache de VS Code.
-  const imageGenerationsCount = await prisma.imageGeneration.count();
+  if (!user) redirect("/sign-in");
 
-  const total = analyses.length;
-  
-  const positive = analyses.filter(a => a.sentimentGlobal.toLowerCase() === 'positif').length;
-  const negative = analyses.filter(a => a.sentimentGlobal.toLowerCase() === 'négatif' || a.sentimentGlobal.toLowerCase() === 'negatif').length;
-  const neutral = total - positive - negative;
+  const lastAudit = user.audits[0] || null;
 
-  const positivePercent = total > 0 ? Math.round((positive / total) * 100) : 0;
-  const negativePercent = total > 0 ? Math.round((negative / total) * 100) : 0;
-  const neutralPercent = total > 0 ? Math.round((neutral / total) * 100) : 0;
-
-  const sentimentData = [
-    { name: 'Positif', value: positivePercent },
-    { name: 'Neutre', value: neutralPercent },
-    { name: 'Négatif', value: negativePercent },
-  ];
-
-  // Simple aggregation for top frustrations & opportunities
-  const frustrationsCount: Record<string, number> = {};
-  const opportunitiesCount: Record<string, number> = {};
-
-  analyses.forEach(a => {
-    const frusts = (a.frustrations as string[]) || [];
-    const opps = (a.opportunitesBusiness as string[]) || [];
-    
-    frusts.forEach(f => {
-      frustrationsCount[f] = (frustrationsCount[f] || 0) + 1;
-    });
-    opps.forEach(o => {
-      opportunitiesCount[o] = (opportunitiesCount[o] || 0) + 1;
-    });
-  });
-
-  const topFrustrations = Object.entries(frustrationsCount)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
-
-  const topOpportunities = Object.entries(opportunitiesCount)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
+  if (!lastAudit) {
+    return (
+      <div className="max-w-4xl mx-auto py-20 px-4 flex flex-col items-center text-center">
+        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+          <Activity className="w-10 h-10 text-primary" />
+        </div>
+        <h1 className="text-3xl font-black mb-4">Bienvenue sur InstaAnalyzer</h1>
+        <p className="text-muted-foreground text-lg mb-8 max-w-lg">
+          Pour commencer à utiliser la plateforme, vous devez d'abord lancer une analyse de votre compte Instagram afin que notre IA puisse vous générer votre plan d'action personnalisé.
+        </p>
+        <Link href="/settings">
+          <Button size="lg" className="text-base font-semibold px-8 py-6 rounded-full shadow-lg shadow-primary/20">
+            Lancer mon analyse maintenant
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Tableau de Bord</h2>
-        <p className="text-muted-foreground mt-2">
-          Vue d'ensemble de vos analyses Instagram.
-        </p>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <KpiCard 
-          title="Analyses Totales" 
-          value={total} 
-          iconName="Activity" 
-          delay={0.1}
-          trend={total > 0 ? "up" : "neutral"}
-          trendValue={total > 0 ? "+1 depuis hier" : "0"}
-        />
-        <KpiCard 
-          title="Sentiment Positif" 
-          value={`${positivePercent}%`} 
-          iconName="Smile" 
-          delay={0.2}
-          trend={positivePercent > 50 ? "up" : "neutral"}
-          trendValue={`${positivePercent}% du total`}
-        />
-        <KpiCard 
-          title="Sentiment Négatif" 
-          value={`${negativePercent}%`} 
-          iconName="Frown" 
-          delay={0.3}
-          trend={negativePercent > 20 ? "down" : "neutral"}
-          trendValue={`${negativePercent}% du total`}
-        />
-        <KpiCard 
-          title="Sentiment Neutre" 
-          value={`${neutralPercent}%`} 
-          iconName="Meh" 
-          delay={0.4}
-        />
-        <KpiCard 
-          title="Images Générées" 
-          value={imageGenerationsCount} 
-          iconName="Image" 
-          delay={0.5}
-          trend={imageGenerationsCount > 0 ? "up" : "neutral"}
-          trendValue="Studio IA"
-        />
-      </div>
-
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-7">
-        <div className="col-span-1 lg:col-span-4">
-          <Card className="bg-card border-border shadow-sm h-full flex flex-col">
-            <CardHeader>
-              <CardTitle>Top Frustrations & Opportunités</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col gap-6">
-              <div>
-                <h4 className="text-sm font-medium text-rose-500 mb-3 flex items-center gap-2">
-                  <Frown className="w-4 h-4" /> Top Frustrations
-                </h4>
-                {topFrustrations.length > 0 ? (
-                  <div className="space-y-2">
-                    {topFrustrations.map(([f, count], i) => (
-                      <div key={i} className="flex justify-between items-center text-sm border-b border-border/50 pb-2">
-                        <span className="text-foreground/90">{f}</span>
-                        <Badge variant="outline" className="text-rose-400 border-rose-500/20">{count} occurences</Badge>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">Aucune donnée.</p>
-                )}
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-emerald-500 mb-3 flex items-center gap-2">
-                  <Smile className="w-4 h-4" /> Top Opportunités
-                </h4>
-                {topOpportunities.length > 0 ? (
-                  <div className="space-y-2">
-                    {topOpportunities.map(([o, count], i) => (
-                      <div key={i} className="flex justify-between items-center text-sm border-b border-border/50 pb-2">
-                        <span className="text-foreground/90">{o}</span>
-                        <Badge variant="outline" className="text-emerald-400 border-emerald-500/20">{count} occurences</Badge>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">Aucune donnée.</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        <div className="col-span-1 lg:col-span-3">
-          <SentimentChart data={sentimentData} delay={0.5} />
-        </div>
-      </div>
-    </div>
+    <AuditDashboard 
+      user={user} 
+      audit={lastAudit as any} 
+      todayTasks={user.agentTasks} 
+      pendingDrafts={user.generatedContents} 
+    />
   );
 }

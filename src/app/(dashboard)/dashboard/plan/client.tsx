@@ -1,0 +1,114 @@
+"use client";
+
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
+
+export function PlanClient({ actionPlans }: any) {
+  const router = useRouter();
+  const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
+
+  const handleAction = async (taskId: string, action: string, content?: any) => {
+    setLoadingTaskId(taskId);
+    try {
+      await fetch("/api/automation/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_id: taskId, action, updated_content: content })
+      });
+      router.refresh();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingTaskId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-8 max-w-6xl mx-auto">
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">Calendrier de Publication</h2>
+        <p className="text-muted-foreground mt-2">Validez ou modifiez les contenus générés par l'IA.</p>
+      </div>
+
+      <div className="grid gap-6">
+        {actionPlans.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Aucun plan d'action</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Faites un audit pour générer votre plan de 90 jours.</p>
+            </CardContent>
+          </Card>
+        ) : actionPlans.map((plan: any) => (
+          <Card key={plan.id}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex justify-between items-center">
+                <span>Semaine {plan.week_number} - <span className="capitalize">{plan.day_of_week}</span></span>
+                <Badge variant={plan.status === "scheduled" ? "default" : "secondary"}>
+                  {plan.status}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4">
+                <p className="font-medium">{plan.topic}</p>
+                <p className="text-sm text-muted-foreground">Type: <span className="uppercase text-primary">{plan.content_type}</span> | CTA: {plan.cta}</p>
+              </div>
+
+              {plan.agentTasks.length > 0 ? (
+                <div className="space-y-4">
+                  {plan.agentTasks.map((task: any) => (
+                    <div key={task.id} className="p-4 bg-muted/30 rounded-lg border">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-bold text-sm">Tâche IA: <span className="capitalize">{task.task_type}</span></span>
+                        <Badge variant="outline">{task.status}</Badge>
+                      </div>
+                      
+                      {task.generatedContents?.map((content: any) => (
+                        <div key={content.id} className="mt-4 p-4 bg-background rounded border border-primary/20 shadow-sm">
+                          <p className="text-xs text-primary font-bold mb-2 uppercase">Contenu Généré (Statut: {content.status})</p>
+                          <pre className="whitespace-pre-wrap text-sm mb-4 font-sans border p-3 rounded bg-muted/20">
+                            {typeof content.content_json === 'string' 
+                              ? content.content_json 
+                              : JSON.stringify(content.content_json, null, 2)}
+                          </pre>
+                          
+                          {content.status === "draft" && (
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleAction(task.id, "approve")}
+                                disabled={loadingTaskId === task.id}
+                                className="bg-emerald-500 hover:bg-emerald-600"
+                              >
+                                Approuver & Publier
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="destructive" 
+                                onClick={() => handleAction(task.id, "skip")}
+                                disabled={loadingTaskId === task.id}
+                              >
+                                Rejeter
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm italic text-muted-foreground">Aucune tâche IA générée pour le moment.</p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BrainCircuit, Loader2, Sparkles, AlertCircle, CheckCircle2, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -125,6 +125,7 @@ function AnswerKey({ questions }: { questions: Question[] }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function QuizStudio({ availableDocs }: { availableDocs: Doc[] }) {
+  const [docs, setDocs] = useState<Doc[]>(availableDocs);
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [totalQuestions, setTotalQuestions] = useState(10);
   const [easyCount, setEasyCount] = useState(3);
@@ -139,6 +140,10 @@ export default function QuizStudio({ availableDocs }: { availableDocs: Doc[] }) 
 
   const currentSum = easyCount + mediumCount + hardCount;
   const isValid = currentSum === totalQuestions && selectedFiles.length > 0;
+
+  useEffect(() => {
+    setDocs(availableDocs);
+  }, [availableDocs]);
 
   const handleFileToggle = (fileName: string) => {
     setSelectedFiles(prev =>
@@ -193,9 +198,9 @@ export default function QuizStudio({ availableDocs }: { availableDocs: Doc[] }) 
             <div className="space-y-3">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select PDFs</label>
               <div className="max-h-36 overflow-y-auto space-y-2 pr-1">
-                {availableDocs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground italic">No PDFs available. Please upload first.</p>
-                ) : availableDocs.map(doc => (
+                {docs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">Aucun PDF disponible. Veuillez en importer d'abord.</p>
+                ) : docs.map(doc => (
                   <label key={doc.id} className="flex items-center space-x-3 cursor-pointer group">
                     <div className="relative flex items-center justify-center">
                       <input type="checkbox" checked={selectedFiles.includes(doc.fileName)} onChange={() => handleFileToggle(doc.fileName)} className="peer sr-only" />

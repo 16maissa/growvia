@@ -1,50 +1,80 @@
 "use client";
 
-import { Bell, Search, UserCircle } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { Bell, UserCircle, Search, LogOut, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 export function Navbar() {
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/sign-in");
+    router.refresh();
+  }
+
   return (
-    <header className="flex h-16 shrink-0 items-center gap-x-4 border-b border-border bg-background px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
-      <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-        <form className="relative flex flex-1" action="#" method="GET">
-          <label htmlFor="search-field" className="sr-only">
-            Search
-          </label>
-          <Search
-            className="pointer-events-none absolute inset-y-0 left-0 h-full w-5 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <input
-            id="search-field"
-            className="block h-full w-full border-0 bg-transparent py-0 pl-8 pr-0 text-foreground placeholder:text-muted-foreground focus:ring-0 sm:text-sm"
-            placeholder="Search analyses..."
-            type="search"
-            name="search"
-          />
-        </form>
-        <div className="flex items-center gap-x-4 lg:gap-x-6">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-            <span className="sr-only">View notifications</span>
-            <Bell className="h-5 w-5" aria-hidden="true" />
-          </Button>
+    <header className="flex h-16 shrink-0 items-center gap-x-4 border-b border-border bg-background px-4 shadow-sm sm:gap-x-6 sm:px-8 relative z-30">
+      {/* Search */}
+      <form className="relative flex flex-1 max-w-xs" action="#" method="GET">
+        <label htmlFor="search-field" className="sr-only">Search</label>
+        <Search className="pointer-events-none absolute inset-y-0 left-0 h-full w-4 text-muted-foreground" aria-hidden="true" />
+        <input
+          id="search-field"
+          className="block h-full w-full border-0 bg-transparent py-0 pl-6 pr-0 text-foreground placeholder:text-muted-foreground focus:ring-0 sm:text-sm"
+          placeholder="Rechercher..."
+          type="search"
+          name="search"
+        />
+      </form>
 
-          {/* Separator */}
-          <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-border" aria-hidden="true" />
+      <div className="flex items-center gap-x-4 ml-auto">
+        {/* Notifications */}
+        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground relative">
+          <span className="sr-only">Notifications</span>
+          <Bell className="h-5 w-5" />
+        </Button>
 
-          {/* Profile dropdown */}
-          <div className="relative">
-            <Button variant="ghost" className="-m-1.5 flex items-center p-1.5 text-muted-foreground hover:text-foreground">
-              <span className="sr-only">Open user menu</span>
-              <UserCircle className="h-8 w-8" aria-hidden="true" />
-              <span className="hidden lg:flex lg:items-center">
-                <span className="ml-4 text-sm font-semibold leading-6" aria-hidden="true">
-                  Admin User
-                </span>
-              </span>
-            </Button>
-          </div>
+        <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-border" aria-hidden="true" />
+
+        {/* User menu */}
+        <div className="relative">
+          <button
+            id="user-menu-btn"
+            onClick={() => setMenuOpen(v => !v)}
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <UserCircle className="h-7 w-7" />
+            <span className="hidden lg:block">Mon compte</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${menuOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {menuOpen && (
+            <>
+              {/* Backdrop */}
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              {/* Dropdown */}
+              <div className="absolute right-0 top-full mt-2 w-48 z-20 rounded-xl border border-border bg-card shadow-xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-border">
+                  <p className="text-xs text-muted-foreground">Connecté en tant que</p>
+                  <p className="text-sm font-semibold truncate">Admin</p>
+                </div>
+                <button
+                  id="logout-btn"
+                  onClick={handleLogout}
+                  disabled={loggingOut}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                >
+                  <LogOut className="w-4 h-4" />
+                  {loggingOut ? "Déconnexion..." : "Se déconnecter"}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>
