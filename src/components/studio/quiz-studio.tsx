@@ -109,7 +109,7 @@ function AnswerKey({ questions }: { questions: Question[] }) {
     <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl overflow-hidden">
       <div className="px-6 py-4 border-b border-emerald-500/20 bg-emerald-500/10 flex items-center gap-2">
         <Sparkles className="w-5 h-5 text-emerald-600" />
-        <h3 className="text-base font-bold text-emerald-700">Answer Key / Corrigé</h3>
+        <h3 className="text-base font-bold text-emerald-700">Answer Key</h3>
       </div>
       <div className="p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {withAnswers.map((q) => (
@@ -199,7 +199,7 @@ export default function QuizStudio({ availableDocs }: { availableDocs: Doc[] }) 
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select PDFs</label>
               <div className="max-h-36 overflow-y-auto space-y-2 pr-1">
                 {docs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground italic">Aucun PDF disponible. Veuillez en importer d'abord.</p>
+                  <p className="text-sm text-muted-foreground italic">No PDF available. Please import one first.</p>
                 ) : docs.map(doc => (
                   <label key={doc.id} className="flex items-center space-x-3 cursor-pointer group">
                     <div className="relative flex items-center justify-center">

@@ -33,15 +33,15 @@ export default function LoginPage() {
           </div>
           <h1 className="text-3xl font-bold tracking-tight">InstaAnalyzer AI</h1>
           <p className="text-muted-foreground mt-2 text-center">
-            Connectez-vous pour accéder à votre tableau de bord SaaS.
+            Sign in to access your SaaS dashboard.
           </p>
         </div>
 
         <Card className="bg-card/50 backdrop-blur-xl border-border shadow-2xl">
           <CardHeader>
-            <CardTitle>Connexion</CardTitle>
+            <CardTitle>Sign In</CardTitle>
             <CardDescription>
-              Entrez vos identifiants pour continuer.
+              Enter your credentials to continue.
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleLogin}>
@@ -51,13 +51,13 @@ export default function LoginPage() {
                 <Input id="email" type="email" placeholder="admin@instaanalyzer.com" required className="bg-background/50" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Mot de passe</Label>
+                <Label htmlFor="password">Password</Label>
                 <Input id="password" type="password" placeholder="••••••••" required className="bg-background/50" />
               </div>
             </CardContent>
             <CardFooter>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Connexion..." : "Se connecter"}
+                {loading ? "Signing in..." : "Sign in"}
               </Button>
             </CardFooter>
           </form>

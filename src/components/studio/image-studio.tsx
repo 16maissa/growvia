@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Download, ImageIcon, Loader2, History } from "lucide-react";
-// @ts-ignore - Le serveur TS a besoin d'être redémarré pour voir l'export
+// @ts-ignore - TS server needs restart to see the export
 import { ImageGeneration } from "@prisma/client";
 
 interface ImageStudioProps {
@@ -71,7 +71,7 @@ export function ImageStudio({ initialHistory }: ImageStudioProps) {
           Studio AI - Image
         </h2>
         <p className="text-muted-foreground mt-2">
-          Générez des visuels uniques grâce à l'intelligence artificielle pour votre contenu.
+          Generate unique visuals with artificial intelligence for your content.
         </p>
       </div>
 
@@ -82,13 +82,13 @@ export function ImageStudio({ initialHistory }: ImageStudioProps) {
               <div className="space-y-4">
                 <div>
                   <label htmlFor="prompt" className="block text-sm font-medium text-foreground mb-2">
-                    Prompt (Description de l'image)
+                    Prompt (Image description)
                   </label>
                   <textarea
                     id="prompt"
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Un paysage futuriste avec des néons roses et bleus..."
+                    placeholder="A futuristic landscape with pink and blue neon lights..."
                     className="w-full min-h-[120px] p-3 rounded-md bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-none text-foreground placeholder:text-muted-foreground"
                     disabled={isGenerating}
                   />
@@ -108,12 +108,12 @@ export function ImageStudio({ initialHistory }: ImageStudioProps) {
                   {isGenerating ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Génération en cours... (jusqu'à 60s)
+                      Generating... (up to 60s)
                     </>
                   ) : (
                     <>
                       <Sparkles className="mr-2 h-4 w-4" />
-                      Générer l'image
+                      Generate image
                     </>
                   )}
                 </Button>
@@ -144,7 +144,7 @@ export function ImageStudio({ initialHistory }: ImageStudioProps) {
                       onClick={() => handleDownload(currentImage.imageBase64, currentImage.prompt)}
                     >
                       <Download className="mr-2 h-4 w-4" />
-                      Télécharger
+                      Download
                     </Button>
                   </div>
                 </motion.div>
@@ -154,12 +154,12 @@ export function ImageStudio({ initialHistory }: ImageStudioProps) {
                     <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse"></div>
                     <Sparkles className="h-12 w-12 text-primary animate-bounce relative z-10" />
                   </div>
-                  <p className="animate-pulse">Création de la magie en cours...</p>
+                  <p className="animate-pulse">Creating the magic...</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center text-muted-foreground">
                   <ImageIcon className="h-16 w-16 mb-4 opacity-20" />
-                  <p>Votre image générée apparaîtra ici.</p>
+                  <p>Your generated image will appear here.</p>
                 </div>
               )}
             </CardContent>
@@ -170,7 +170,7 @@ export function ImageStudio({ initialHistory }: ImageStudioProps) {
       {history.length > 0 && (
         <div className="mt-12">
           <h3 className="text-xl font-semibold mb-6 flex items-center">
-            <History className="mr-2 h-5 w-5 text-primary" /> Historique de génération
+            <History className="mr-2 h-5 w-5 text-primary" /> Generation history
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {history.map((item, idx) => (

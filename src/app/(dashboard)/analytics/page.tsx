@@ -45,7 +45,7 @@ export default function AnalyticsPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Une erreur est survenue lors de l'analyse.");
+        throw new Error(data.error || "An error occurred during analysis.");
       }
 
       setResult(data.analysis);
@@ -59,17 +59,17 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Nouvelle Analyse</h2>
+        <h2 className="text-3xl font-bold tracking-tight">New Analysis</h2>
         <p className="text-muted-foreground mt-2">
-          Analysez un compte Instagram pour en extraire des insights business.
+          Analyze an Instagram account to extract business insights.
         </p>
       </div>
 
       <Card className="bg-card border-border shadow-sm">
         <CardHeader>
-          <CardTitle>Lancer une analyse</CardTitle>
+          <CardTitle>Run an analysis</CardTitle>
           <CardDescription>
-            Entrez le nom d'utilisateur Instagram que vous souhaitez analyser. Notre IA via n8n va traiter les commentaires récents.
+            Enter the Instagram username to analyze. Our AI via n8n will process recent comments.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -86,7 +86,7 @@ export default function AnalyticsPage() {
             </div>
             <Button type="submit" disabled={loading || !username} className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[120px]">
               {loading ? <Spinner size={18} className="mr-2 text-white" /> : null}
-              {loading ? "Analyse..." : "Analyser"}
+              {loading ? "Analyzing..." : "Analyze"}
             </Button>
           </form>
         </CardContent>
@@ -102,7 +102,7 @@ export default function AnalyticsPage() {
           >
             <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Erreur</AlertTitle>
+              <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           </motion.div>
@@ -120,7 +120,7 @@ export default function AnalyticsPage() {
               <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
               <Spinner size={48} />
             </div>
-            <p className="text-muted-foreground animate-pulse">L'IA de n8n analyse les données, veuillez patienter...</p>
+            <p className="text-muted-foreground animate-pulse">n8n AI is analyzing the data, please wait...</p>
           </motion.div>
         )}
 
@@ -132,7 +132,7 @@ export default function AnalyticsPage() {
             animate={{ opacity: 1, y: 0 }}
           >
             <AnalysisCard 
-              title="Sentiment Global" 
+              title="Global Sentiment" 
               icon={Activity} 
               items={[result.sentimentGlobal]} 
               delay={0.1}
@@ -145,13 +145,13 @@ export default function AnalyticsPage() {
               badgeColor="destructive"
             />
             <AnalysisCard 
-              title="Besoins Clients" 
+              title="Client Needs" 
               icon={HeartHandshake} 
               items={result.besoinsClients} 
               delay={0.3} 
             />
             <AnalysisCard 
-              title="Opportunités Business" 
+              title="Business Opportunities" 
               icon={Lightbulb} 
               items={result.opportunitesBusiness} 
               delay={0.4} 

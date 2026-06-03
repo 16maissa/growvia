@@ -20,7 +20,7 @@ export function SentimentChart({ data, delay = 0 }: SentimentChartProps) {
     >
       <Card className="bg-card border-border shadow-sm h-full">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Répartition des Sentiments</CardTitle>
+          <CardTitle className="text-lg font-semibold">Sentiment Distribution</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[300px] w-full min-h-[300px]">

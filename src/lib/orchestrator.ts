@@ -1,13 +1,18 @@
 import { prisma } from "@/lib/prisma";
 
 const WEBHOOK_MAP: Record<string, string | undefined> = {
-  "reel": process.env.N8N_WEBHOOK_AGENT_REEL,
-  "image": process.env.N8N_WEBHOOK_AGENT_IMAGE,
-  "carousel": process.env.N8N_WEBHOOK_AGENT_IMAGE,
-  "quiz": process.env.N8N_WEBHOOK_AGENT_QUIZ,
-  "caption": process.env.N8N_WEBHOOK_AGENT_CAPTION,
-  "publish": process.env.N8N_WEBHOOK_AGENT_PUBLISH,
-  "engagement": process.env.N8N_WEBHOOK_AGENT_ENGAGEMENT,
+  "reel":       process.env.N8N_VIDEO_WEBHOOK_URL,
+  "video":      process.env.N8N_VIDEO_WEBHOOK_URL,
+  "story":      process.env.N8N_VIDEO_WEBHOOK_URL,
+  "image":      process.env.N8N_IMAGE_WEBHOOK_URL,
+  "carousel":   process.env.N8N_IMAGE_WEBHOOK_URL,
+  "carrousel":  process.env.N8N_IMAGE_WEBHOOK_URL,
+  "post":       process.env.N8N_IMAGE_WEBHOOK_URL,
+  "quiz":       process.env.N8N_QUIZ_WEBHOOK_URL,
+  "qa":         process.env.N8N_QUIZ_WEBHOOK_URL,
+  "curriculum": process.env.N8N_CURRICULUM_WEBHOOK_URL,
+  "cours":      process.env.N8N_CURRICULUM_WEBHOOK_URL,
+  "formation":  process.env.N8N_CURRICULUM_WEBHOOK_URL,
 };
 
 export async function runOrchestrator(userId: string) {
@@ -64,7 +69,7 @@ export async function runOrchestrator(userId: string) {
       data: { status: "running", executed_at: new Date() }
     });
 
-    const webhookUrl = WEBHOOK_MAP[type] || WEBHOOK_MAP["caption"]; // fallback
+    const webhookUrl = WEBHOOK_MAP[type] || WEBHOOK_MAP["reel"]; // fallback to video
     if (!webhookUrl) {
       await failTask(task.id, "Webhook URL missing for type: " + type);
       continue;

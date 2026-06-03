@@ -16,6 +16,63 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
   }
 }
 
+function getValidParsedJson(rawText: string): any {
+  let text = rawText.replace(/```json|```/g, "").trim();
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {}
+
+  // Backtrack character by character to find the last syntactically valid JSON prefix
+  for (let len = text.length; len > 0; len--) {
+    const subText = text.substring(0, len).trim();
+    let inString = false;
+    let isEscaped = false;
+    const stack: string[] = [];
+
+    for (let i = 0; i < subText.length; i++) {
+      const char = subText[i];
+      if (isEscaped) {
+        isEscaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        isEscaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (char === "{" || char === "[") {
+          stack.push(char);
+        } else if (char === "}") {
+          if (stack.length > 0 && stack[stack.length - 1] === "{") stack.pop();
+        } else if (char === "]") {
+          if (stack.length > 0 && stack[stack.length - 1] === "[") stack.pop();
+        }
+      }
+    }
+
+    let repaired = subText;
+    if (inString) repaired += '"';
+
+    for (let j = stack.length - 1; j >= 0; j--) {
+      if (stack[j] === "{") repaired += "}";
+      else if (stack[j] === "[") repaired += "]";
+    }
+
+    try {
+      return JSON.parse(repaired);
+    } catch (err) {
+      // Keep backtracking
+    }
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
@@ -230,7 +287,38 @@ export async function POST(req: NextRequest) {
     let actionPlansCreated = 0;
 
     try {
-      const aiReport = n8nData.ai_report;
+      let aiReport = n8nData.ai_report;
+
+      // Si le plan est marqué comme tronqué, ou si c'est un objet vide/incomplet, on essaie de le réparer depuis le texte brut
+      if (aiReport?.error || !aiReport || Object.keys(aiReport).length <= 2) {
+        const rawContent = n8nData.plan_display?.content;
+        if (typeof rawContent === "string" && rawContent) {
+          console.log("Attempting to repair truncated JSON from plan_display.content...");
+          const repaired = getValidParsedJson(rawContent);
+          if (repaired && Object.keys(repaired).length > 2) {
+            aiReport = repaired;
+            console.log("Successfully repaired truncated JSON!");
+            
+            // On met à jour aiReportData pour qu'il contienne l'objet réparé en base
+            // afin que le frontend n'affiche plus "JSON tronqué" dans le rapport IA
+            aiReportData.ai_report = repaired;
+            aiReportData.error = false;
+            aiReportData.message = undefined;
+            if (aiReportData.plan_display) {
+              aiReportData.plan_display.type = "structured_plan";
+              aiReportData.plan_display.content = repaired;
+            }
+            
+            // On met également à jour l'audit créé précédemment avec les données réparées
+            await prisma.audit.update({
+              where: { id: audit.id },
+              data: {
+                ai_report_json: aiReportData
+              }
+            });
+          }
+        }
+      }
       
       if (!aiReport) throw new Error('ai_report absent');
 
@@ -244,27 +332,59 @@ export async function POST(req: NextRequest) {
         optimal_hour: string;
       }> = [];
 
-      // Supporter mois_1 / mois_2 / mois_3 ET mois1 / mois2 / mois3
-      for (let m = 1; m <= 3; m++) {
-        const moisKey = aiReport[`mois_${m}`] || aiReport[`mois${m}`] || aiReport[`month_${m}`];
-        if (!moisKey) continue;
+      // Détecter et parser le nouveau format simplifié (aiReport.tasks[])
+      if (Array.isArray(aiReport.tasks)) {
+        console.log(`Parsing new format tasks... Found ${aiReport.tasks.length} tasks.`);
+        for (const t of aiReport.tasks) {
+          // Extraire l'action / le titre / la description de manière extrêmement robuste
+          let topicText = "Tâche à réaliser";
+          if (t.action) {
+            topicText = t.action;
+          } else if (t.title && t.description) {
+            topicText = `${t.title}: ${t.description}`;
+          } else {
+            topicText = t.title || t.description || "Sujet à définir";
+          }
 
-        // Gérer le cas où mois_X est directement un tableau de semaines
-        const semaines = Array.isArray(moisKey) ? moisKey : (moisKey.semaines || moisKey.weeks || []);
-        
-        for (const semaine of semaines) {
-          const weekNumber = semaine.semaine || semaine.week || semaine.week_number || m * 4 - 3;
-          const actions = semaine.actions || semaine.tasks || [];
+          // Déterminer la valeur du jour
+          let dayVal = "Jour 1";
+          if (t.day != null) {
+            const rawDay = String(t.day).trim();
+            dayVal = rawDay.startsWith("Jour") ? rawDay : `Jour ${rawDay}`;
+          }
 
-          for (const action of actions) {
-            allActions.push({
-              week_number: Number(weekNumber),
-              day_of_week: action.jour || action.day || action.day_of_week || 'Lundi',
-              content_type: action.type || action.content_type || 'Reel',
-              topic: action.sujet || action.topic || action.action || 'Sujet à définir',
-              cta: action.cta || action.call_to_action || '',
-              optimal_hour: action.heure || action.heure_optimale || action.optimal_hour || '19h',
-            });
+          allActions.push({
+            week_number: Number(t.week || 1),
+            day_of_week: dayVal,
+            content_type: t.type || t.content_type || "Reel",
+            topic: topicText,
+            cta: t.cta || t.call_to_action || "",
+            optimal_hour: t.priority || t.optimal_hour || "high",
+          });
+        }
+      } else {
+        // Supporter l'ancien format mois_1 / mois_2 / mois_3 ET mois1 / mois2 / mois3
+        for (let m = 1; m <= 3; m++) {
+          const moisKey = aiReport[`mois_${m}`] || aiReport[`mois${m}`] || aiReport[`month_${m}`];
+          if (!moisKey) continue;
+
+          // Gérer le cas où mois_X est directement un tableau de semaines
+          const semaines = Array.isArray(moisKey) ? moisKey : (moisKey.semaines || moisKey.weeks || []);
+          
+          for (const semaine of semaines) {
+            const weekNumber = semaine.semaine || semaine.week || semaine.week_number || m * 4 - 3;
+            const actions = semaine.actions || semaine.tasks || [];
+
+            for (const action of actions) {
+              allActions.push({
+                week_number: Number(weekNumber),
+                day_of_week: action.jour || action.day || action.day_of_week || 'Lundi',
+                content_type: action.type || action.content_type || 'Reel',
+                topic: action.sujet || action.topic || action.action || 'Sujet à définir',
+                cta: action.cta || action.call_to_action || '',
+                optimal_hour: action.heure || action.heure_optimale || action.optimal_hour || '19h',
+              });
+            }
           }
         }
       }

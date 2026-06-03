@@ -46,16 +46,16 @@ export default async function DashboardPage() {
   if (!lastAudit) {
     return (
       <div className="max-w-4xl mx-auto py-20 px-4 flex flex-col items-center text-center">
-        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
-          <Activity className="w-10 h-10 text-primary" />
+        <div className="w-20 h-20 bg-primary-600/10 rounded-full flex items-center justify-center mb-6">
+          <Activity className="w-10 h-10 text-primary-600" />
         </div>
-        <h1 className="text-3xl font-black mb-4">Bienvenue sur InstaAnalyzer</h1>
-        <p className="text-muted-foreground text-lg mb-8 max-w-lg">
-          Pour commencer à utiliser la plateforme, vous devez d'abord lancer une analyse de votre compte Instagram afin que notre IA puisse vous générer votre plan d'action personnalisé.
+        <h1 className="text-3xl font-black mb-4 text-[var(--text-primary)]">Welcome to Growvia</h1>
+        <p className="text-[var(--text-secondary)] text-lg mb-8 max-w-lg">
+          To get started, launch an analysis of your account so our AI can generate your personalized action plan.
         </p>
         <Link href="/settings">
-          <Button size="lg" className="text-base font-semibold px-8 py-6 rounded-full shadow-lg shadow-primary/20">
-            Lancer mon analyse maintenant
+          <Button size="lg" className="text-base font-semibold px-8 py-6 rounded-full shadow-lg bg-[#0F6E56] hover:bg-[#085041] text-white">
+            Launch my analysis now
           </Button>
         </Link>
       </div>

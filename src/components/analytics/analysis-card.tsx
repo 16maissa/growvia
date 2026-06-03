@@ -29,7 +29,7 @@ export function AnalysisCard({ title, icon: Icon, items, delay = 0, badgeColor =
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">Aucune donnée disponible.</p>
+            <p className="text-sm text-muted-foreground italic">No data available.</p>
           ) : (
             <ul className="space-y-3">
               {items.map((item, i) => (

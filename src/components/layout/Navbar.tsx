@@ -18,7 +18,7 @@ export function Navbar() {
   }
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-x-4 border-b border-border bg-background px-4 shadow-sm sm:gap-x-6 sm:px-8 relative z-30">
+    <header className="flex h-16 shrink-0 items-center gap-x-4 border-b border-[var(--border-color)] bg-[var(--bg-surface)] px-4 shadow-sm sm:gap-x-6 sm:px-8 relative z-30 transition-colors duration-200">
       {/* Search */}
       <form className="relative flex flex-1 max-w-xs" action="#" method="GET">
         <label htmlFor="search-field" className="sr-only">Search</label>
@@ -26,7 +26,7 @@ export function Navbar() {
         <input
           id="search-field"
           className="block h-full w-full border-0 bg-transparent py-0 pl-6 pr-0 text-foreground placeholder:text-muted-foreground focus:ring-0 sm:text-sm"
-          placeholder="Rechercher..."
+          placeholder="Search..."
           type="search"
           name="search"
         />
@@ -49,7 +49,7 @@ export function Navbar() {
             className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
             <UserCircle className="h-7 w-7" />
-            <span className="hidden lg:block">Mon compte</span>
+            <span className="hidden lg:block">My account</span>
             <ChevronDown className={`h-4 w-4 transition-transform ${menuOpen ? "rotate-180" : ""}`} />
           </button>
 
@@ -60,7 +60,7 @@ export function Navbar() {
               {/* Dropdown */}
               <div className="absolute right-0 top-full mt-2 w-48 z-20 rounded-xl border border-border bg-card shadow-xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-border">
-                  <p className="text-xs text-muted-foreground">Connecté en tant que</p>
+                  <p className="text-xs text-muted-foreground">Signed in as</p>
                   <p className="text-sm font-semibold truncate">Admin</p>
                 </div>
                 <button
@@ -70,7 +70,7 @@ export function Navbar() {
                   className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                 >
                   <LogOut className="w-4 h-4" />
-                  {loggingOut ? "Déconnexion..." : "Se déconnecter"}
+                  {loggingOut ? "Signing out..." : "Sign out"}
                 </button>
               </div>
             </>
