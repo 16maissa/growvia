@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
-  context: { params: { tool: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -18,7 +18,7 @@ export async function POST(
 
     const userId = String(session.userId);
 
-    const { tool } = context.params;
+    const { id: tool } = await context.params;
 
     // console.debug("[TOOL] userId:", userId);
     // console.debug("[TOOL] tool:", tool);
