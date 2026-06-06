@@ -1,27 +1,22 @@
+import { cookies } from "next/headers";
 import { decrypt } from "./jwt";
-import { NextRequest } from "next/server";
 
-export async function getSession(req: NextRequest) {
+export async function getSession() {
   try {
-    const token = req.cookies.get("session")?.value;
+    const cookieStore = await cookies();
+    const token = cookieStore.get("session")?.value;
 
-    console.log("[AUTH] cookie token:", token);
+    console.log("[AUTH] token:", token ? "EXISTS" : "MISSING");
 
-    if (!token) {
-      console.log("[AUTH] NO COOKIE");
-      return null;
-    }
+    if (!token) return null;
 
     const session = await decrypt(token);
 
-    if (!session) {
-      console.log("[AUTH] INVALID SESSION");
-      return null;
-    }
+    console.log("[AUTH] session:", session);
 
     return session;
   } catch (err) {
-    console.log("[AUTH] ERROR:", err);
+    console.error("[AUTH ERROR]", err);
     return null;
   }
 }
