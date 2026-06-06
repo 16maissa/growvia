@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 
@@ -354,24 +357,32 @@ function TaskCard({ action, userId, onAction, currentMode }: any) {
     setGenerating(true);
     setGenError(null);
     try {
-      const res = await fetch("/api/agent/generate", {
+      const res = await fetch("/api/orchestrator/generate-task", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actionPlanId: action.id, userId })
+        body: JSON.stringify({ taskId: action.id })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generation error");
-      setGeneratedContent(data);
-      setStatus("done");
-      setShowContent(true);
+      if (data.skipped) {
+        setStatus("skipped");
+        setGenError(data.error || "Skipped: Already generated");
+      } else {
+        setGeneratedContent(data.content);
+        setStatus("done");
+        setShowContent(true);
+      }
     } catch (e: any) {
       setGenError(e.message || "Generation error, please retry.");
+      setStatus("failed");
     } finally {
       setGenerating(false);
     }
   };
 
   const isDone = status === "done" || status === "approved";
+  const isFailed = status === "failed";
+  const isRunning = status === "running" || generating;
 
   return (
     <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -387,9 +398,6 @@ function TaskCard({ action, userId, onAction, currentMode }: any) {
             <Badge variant="outline" className={`text-[10px] ml-2 ${statusColor}`}>
               {isDone ? "✓ Done" : status}
             </Badge>
-            {action.isFallback && (
-              <Badge variant="outline" className="text-[10px] border-orange-500/30 text-orange-500 bg-orange-500/10">Not synced</Badge>
-            )}
           </div>
           <p className="font-medium text-sm">{action.topic}</p>
           {action.cta && <p className="text-xs text-muted-foreground mt-1">CTA: <span className="italic">{action.cta}</span></p>}
@@ -397,16 +405,14 @@ function TaskCard({ action, userId, onAction, currentMode }: any) {
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-2 shrink-0">
-          {/* LIBRE / GUIDE mode — show Générer button on pending tasks */}
-          {(currentMode === "libre" || currentMode === "guide") && !isDone && (
+          {status === "planned" && currentMode === "semi_auto" && (
             <Button
-              id={`btn-generate-${action.id}`}
               size="sm"
               onClick={handleGenerate}
-              disabled={generating}
+              disabled={isRunning}
               className="text-xs h-8 gap-1.5 min-w-[110px]"
             >
-              {generating ? (
+              {isRunning ? (
                 <><Loader2 className="w-3 h-3 animate-spin" /> Generating...</>
               ) : (
                 <>⚡ Generate</>
@@ -414,33 +420,16 @@ function TaskCard({ action, userId, onAction, currentMode }: any) {
             </Button>
           )}
 
-          {/* Show/hide content toggle if already generated */}
-          {isDone && generatedContent && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowContent(v => !v)}
-              className="text-xs h-8"
-            >
-              {showContent ? "Hide" : "View content"}
+          {isFailed && (
+            <Button size="sm" onClick={handleGenerate} disabled={isRunning} variant="outline" className="text-xs h-8 text-rose-500">
+              {isRunning ? "Retrying..." : "Retry"}
             </Button>
           )}
 
-          {/* SEMI mode — approve / edit / skip */}
-          {currentMode === "semi" && status === "draft" && (
-            <div className="flex gap-2">
-              <Button size="sm" onClick={() => onAction(action.id, "approve")} className="text-xs h-8 bg-emerald-500 hover:bg-emerald-600 text-white">Approve</Button>
-              <Button size="sm" variant="outline" onClick={() => onAction(action.id, "edit")} className="text-xs h-8">Edit</Button>
-              <Button size="sm" variant="ghost" onClick={() => onAction(action.id, "skip")} className="text-xs h-8 text-rose-500">Skip</Button>
-            </div>
-          )}
-          {currentMode === "semi" && status === "pending" && (
-            <span className="text-xs text-muted-foreground italic">Pending...</span>
-          )}
-
-          {/* AUTO mode */}
-          {currentMode === "auto" && (
-            <span className="text-xs text-muted-foreground italic">Automated</span>
+          {isDone && (
+            <Button size="sm" variant="outline" onClick={() => setShowContent(v => !v)} className="text-xs h-8">
+              {showContent ? "Hide" : "View Draft"}
+            </Button>
           )}
         </div>
       </div>
@@ -553,60 +542,25 @@ function PlanDisplay({ planDisplay }: { planDisplay: PlanDisplay | null }) {
 // ─── Main Component ────────────────────────────────────────────────────────────
 export function AuditDashboard({ user, audit, todayTasks, pendingDrafts }: any) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"overview" | "errors" | "plan" | "revenue" | "ai">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "errors" | "revenue" | "ai">("overview");
   const [taskStates, setTaskStates] = useState<Record<string, "pending" | "accepted" | "skipped">>({});
   const [loggingOut, setLoggingOut] = useState(false);
   const [isChangingMode, setIsChangingMode] = useState(false);
   const [modeError, setModeError] = useState<string | null>(null);
 
+  // Analysis Form State
+  const [showAnalysisForm, setShowAnalysisForm] = useState(false);
+  const [niche, setNiche] = useState("");
+  const [formAudience, setFormAudience] = useState("");
+  const [goals, setGoals] = useState("");
+  const [preferences, setPreferences] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
   const planLevel = user?.userProfile?.plan || "libre";
   const currentMode = user?.automationPrefs?.mode || "libre";
 
-  const handleModeChange = async (newMode: string) => {
-    setIsChangingMode(true);
-    setModeError(null);
-    try {
-      const res = await fetch("/api/automation/mode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: newMode })
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Error changing mode");
-      }
-      router.refresh();
-    } catch (e: any) {
-      setModeError(e.message);
-    } finally {
-      setIsChangingMode(false);
-    }
-  };
-
-  const handleAction = async (taskId: string, action: string) => {
-    if (action === "approve" || action === "skip" || action === "edit") {
-      try {
-        await fetch("/api/automation/approve", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ task_id: taskId, action })
-        });
-        router.refresh();
-      } catch (e) {
-        console.error("Automation action failed:", e);
-      }
-    }
-  };
-
-  const errors: AuditError[] = Array.isArray(audit.errors_json) ? audit.errors_json : [];
-  const metrics: Metrics     = (audit.metrics_json as Metrics) ?? {};
-  const revenue: RevenueEstimation = (audit.revenue_estimation_json as RevenueEstimation) ?? {};
-  const profile: any         = audit.profile_json ?? {};
-  const audience: Audience   = (audit.audience_json as Audience) ?? {};
   let plans = audit.actionPlans || [];
-
-  // ai_report_json may contain plan_display key too (stored from n8n output)
-  const aiReport: any  = audit.ai_report_json ?? {};
+  const aiReport: any = audit.ai_report_json ?? {};
 
   // Fallback : afficher depuis ai_report_json si ActionPlans absents
   if (plans.length === 0 && aiReport) {
@@ -635,6 +589,81 @@ export function AuditDashboard({ user, audit, todayTasks, pendingDrafts }: any) 
     plans = fallbackActions;
   }
 
+  const handleModeChange = async (newMode: string) => {
+    if (newMode === "semi_auto" && plans.length === 0 && !showAnalysisForm) {
+      setShowAnalysisForm(true);
+      return;
+    }
+
+    setIsChangingMode(true);
+    setModeError(null);
+    try {
+      const res = await fetch("/api/automation/mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: newMode })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Error changing mode");
+      }
+      router.refresh();
+    } catch (e: any) {
+      setModeError(e.message);
+    } finally {
+      setIsChangingMode(false);
+    }
+  };
+
+  const handleAnalysisSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsAnalyzing(true);
+    setModeError(null);
+    try {
+      const planRes = await fetch("/api/orchestrator/generate-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ niche, audience: formAudience, goals, preferences })
+      });
+      if (!planRes.ok) throw new Error("Failed to generate plan");
+      
+      const res = await fetch("/api/automation/mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "semi_auto" })
+      });
+      if (!res.ok) throw new Error("Error changing mode");
+      
+      setShowAnalysisForm(false);
+      router.refresh();
+    } catch (e: any) {
+      setModeError(e.message);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleAction = async (taskId: string, action: string) => {
+    if (action === "approve" || action === "skip" || action === "edit") {
+      try {
+        await fetch("/api/automation/approve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ task_id: taskId, action })
+        });
+        router.refresh();
+      } catch (e) {
+        console.error("Automation action failed:", e);
+      }
+    }
+  };
+
+  const errors: AuditError[] = Array.isArray(audit.errors_json) ? audit.errors_json : [];
+  const metrics: Metrics     = (audit.metrics_json as Metrics) ?? {};
+  const revenue: RevenueEstimation = (audit.revenue_estimation_json as RevenueEstimation) ?? {};
+  const profile: any         = audit.profile_json ?? {};
+  const audienceData: Audience   = (audit.audience_json as Audience) ?? {};
+
   const planDisplay: PlanDisplay | null = aiReport?.plan_display ?? null;
   const auditSummary: any = aiReport?.audit_summary ?? null;
 
@@ -661,7 +690,6 @@ export function AuditDashboard({ user, audit, todayTasks, pendingDrafts }: any) 
   const tabs = [
     { id: "overview", label: "Overview", icon: BarChart2 },
     { id: "errors",   label: `Errors (${errors.length})`, icon: AlertTriangle },
-    { id: "plan",     label: `90-Day Plan (${plans.length})`, icon: Target },
     { id: "revenue",  label: "Revenue", icon: DollarSign },
     { id: "ai",       label: "AI Report", icon: FileText },
   ];
@@ -719,9 +747,9 @@ export function AuditDashboard({ user, audit, todayTasks, pendingDrafts }: any) 
               <CardTitle>Operating Mode</CardTitle>
               <CardDescription>Current plan: <strong className="text-primary uppercase">{planLevel}</strong></CardDescription>
             </div>
-            {(currentMode === "semi" || currentMode === "auto") && (
-              <Button variant="destructive" onClick={() => handleModeChange("guide")} disabled={isChangingMode}>
-                Pause Agent
+            {(currentMode === "semi_auto" || currentMode === "auto") && (
+              <Button variant="destructive" onClick={() => handleModeChange("libre")} disabled={isChangingMode}>
+                Stop Automations
               </Button>
             )}
           </div>
@@ -734,18 +762,11 @@ export function AuditDashboard({ user, audit, todayTasks, pendingDrafts }: any) 
             disabled={isChangingMode}
           />
           <ModeCard 
-            title="Guide" icon={Globe} mode="guide" 
-            currentMode={currentMode} 
-            disabled={planLevel === "libre" || isChangingMode}
-            locked={planLevel === "libre"}
-            onClick={() => handleModeChange("guide")}
-          />
-          <ModeCard 
-            title="Semi-Auto" icon={Activity} mode="semi" 
+            title="Semi-Auto" icon={Activity} mode="semi_auto" 
             currentMode={currentMode} 
             disabled={planLevel !== "autopilote" || isChangingMode}
             locked={planLevel !== "autopilote"}
-            onClick={() => handleModeChange("semi")}
+            onClick={() => handleModeChange("semi_auto")}
           />
           <ModeCard 
             title="Auto" icon={Activity} mode="auto" 
@@ -760,7 +781,9 @@ export function AuditDashboard({ user, audit, todayTasks, pendingDrafts }: any) 
       {/* The raw auditSummary JSON banner has been removed, as the data is already presented in the cards below */}
 
       {/* ── Score + Plan Type + Profile ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="md:col-span-1 flex items-center justify-center py-6 bg-gradient-to-br from-primary/5 to-purple-500/5 border-primary/20">
           <div className="text-center space-y-4">
             <ScoreRing score={audit.score ?? 0} />
@@ -813,12 +836,12 @@ export function AuditDashboard({ user, audit, todayTasks, pendingDrafts }: any) 
       </div>
 
       {/* ── Audience row (if present) ── */}
-      {(audience.top_country || audience.top_age_group || audience.gender_split || audience.active_hours) && (
+      {(audienceData.top_country || audienceData.top_age_group || audienceData.gender_split || audienceData.active_hours) && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {audience.top_country   && <MetricCard icon={Globe}    label="Main Country"   value={audience.top_country} />}
-          {audience.top_age_group && <MetricCard icon={Users}    label="Age Range"    value={audience.top_age_group} />}
-          {audience.gender_split  && <MetricCard icon={Activity} label="Gender"             value={audience.gender_split} />}
-          {audience.active_hours  && <MetricCard icon={Clock}    label="Active Hours"   value={audience.active_hours} />}
+          {audienceData.top_country   && <MetricCard icon={Globe}    label="Main Country"   value={audienceData.top_country} />}
+          {audienceData.top_age_group && <MetricCard icon={Users}    label="Age Range"    value={audienceData.top_age_group} />}
+          {audienceData.gender_split  && <MetricCard icon={Activity} label="Gender"             value={audienceData.gender_split} />}
+          {audienceData.active_hours  && <MetricCard icon={Clock}    label="Active Hours"   value={audienceData.active_hours} />}
         </div>
       )}
 
@@ -899,42 +922,6 @@ export function AuditDashboard({ user, audit, todayTasks, pendingDrafts }: any) 
                 errors
                   .sort((a, b) => ({ CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3 }[a.severity] ?? 4) - ({ CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3 }[b.severity] ?? 4))
                   .map((err, i) => <ErrorCard key={i} error={err} />)
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── PLAN TAB ── */}
-        {activeTab === "plan" && (
-          <motion.div key="plan" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <div className="space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h2 className="text-xl font-bold">90-Day Action Plan</h2>
-                {totalTasks > 0 && (
-                  <div className="flex items-center gap-4">
-                    <div className="text-sm text-muted-foreground">{acceptedCount}/{totalTasks} approved</div>
-                    <div className="w-40 h-2 bg-border rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
-                    </div>
-                    <div className="text-sm font-bold text-primary">{progressPct}%</div>
-                  </div>
-                )}
-              </div>
-
-              {plans.length === 0 ? (
-                <div className="text-center p-12 text-muted-foreground border rounded-xl bg-card">
-                  <Target className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                  <p className="mb-4">No tasks planned yet.</p>
-                  <Button variant="outline" onClick={() => window.location.href = '/settings'}>Restart analysis</Button>
-                </div>
-              ) : (
-                                [1, 2, 3].map(m => (
-                  <MonthSection key={m} monthNum={m} plans={plans}
-                    currentMode={currentMode}
-                    onAction={handleAction}
-                    userId={user?.id}
-                  />
-                ))
               )}
             </div>
           </motion.div>
@@ -1045,6 +1032,72 @@ export function AuditDashboard({ user, audit, todayTasks, pendingDrafts }: any) 
         )}
 
       </AnimatePresence>
+        </div>
+
+        <div className="lg:col-span-1 space-y-6">
+          <div className="sticky top-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Target className="w-5 h-5 text-primary" />
+              <h2 className="text-xl font-bold">Action Plan</h2>
+            </div>
+            
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h2 className="text-xl font-bold">90-Day Action Plan</h2>
+                {totalTasks > 0 && (
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm text-muted-foreground">{acceptedCount}/{totalTasks} approved</div>
+                    <div className="w-40 h-2 bg-border rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
+                    </div>
+                    <div className="text-sm font-bold text-primary">{progressPct}%</div>
+                  </div>
+                )}
+              </div>
+              
+              <MonthSection monthNum={1} plans={plans} currentMode={currentMode} onAction={handleAction} userId={user?.id} />
+              <MonthSection monthNum={2} plans={plans} currentMode={currentMode} onAction={handleAction} userId={user?.id} />
+              <MonthSection monthNum={3} plans={plans} currentMode={currentMode} onAction={handleAction} userId={user?.id} />
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      {/* Modal for Analysis Form */}
+      <AnimatePresence>
+        {showAnalysisForm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-card w-full max-w-lg rounded-xl shadow-xl border border-border p-6 relative overflow-y-auto max-h-[90vh]">
+              <Button variant="ghost" size="icon" className="absolute top-2 right-2" onClick={() => setShowAnalysisForm(false)}><XCircle className="w-5 h-5" /></Button>
+              <h2 className="text-2xl font-bold mb-2">Deep Profile Analysis</h2>
+              <p className="text-sm text-muted-foreground mb-6">Tell us about your strategy to generate a personalized 90-day action plan.</p>
+              <form onSubmit={handleAnalysisSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Main Niche</Label>
+                  <Input required placeholder="e.g. Fitness, Real Estate, Coaching..." value={niche} onChange={e => setNiche(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Target Audience</Label>
+                  <Input required placeholder="Who are you trying to reach?" value={formAudience} onChange={e => setFormAudience(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Main Goals</Label>
+                  <Input required placeholder="e.g. More sales, followers, engagement..." value={goals} onChange={e => setGoals(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Content Preferences</Label>
+                  <Textarea placeholder="Any specific topics or formats you like?" value={preferences} onChange={e => setPreferences(e.target.value)} />
+                </div>
+                <Button type="submit" className="w-full" disabled={isAnalyzing}>
+                  {isAnalyzing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin"/> Analyzing your profile...</> : "Start Deep Analysis"}
+                </Button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

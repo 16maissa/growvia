@@ -59,9 +59,9 @@ export default function SignUpPage() {
               <div className="flex items-center justify-center w-10 h-10 rounded-[10px] bg-[#0F6E56]">
                 <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" xmlns="http://www.w3.org/2000/svg">
                   <path d="M4 17 C4 17 6 10 12 10 C18 10 20 4 20 4"
-                    stroke="#9FE1CB" stroke-width="2" stroke-linecap="round"/>
+                    stroke="#9FE1CB" strokeWidth="2" strokeLinecap="round"/>
                   <path d="M20 4 L16 4 M20 4 L20 8"
-                    stroke="#9FE1CB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    stroke="#9FE1CB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   <circle cx="12" cy="17" r="2.5" fill="#5DCAA5"/>
                 </svg>
               </div>

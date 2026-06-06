@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       
       if (diffDays < 14) {
         return NextResponse.json({ 
-          error: "Le mode Auto n'est activable qu'après 14 jours d'utilisation du mode Semi-Auto pour garantir la qualité." 
+          error: "Auto mode can only be activated after 14 days of using Semi-Auto mode to guarantee quality." 
         }, { status: 403 });
       }
     }
@@ -51,8 +51,8 @@ export async function POST(req: NextRequest) {
             auto_publish: true,
             validation_mode: "auto"
           }),
-          // If semi, enforce manual validation
-          ...(mode === "semi" && {
+          // If semi-auto, enforce manual validation
+          ...(mode === "semi_auto" && {
             validation_mode: "manual"
           })
         }

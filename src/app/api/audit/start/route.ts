@@ -113,12 +113,12 @@ export async function POST(req: NextRequest) {
     if (plan === "autopilote") {
       await prisma.automationPrefs.update({
         where: { userId: session.userId },
-        data: { mode: "semi" },
+        data: { mode: "semi_auto" },
       });
     } else if (plan === "croissance") {
       await prisma.automationPrefs.update({
         where: { userId: session.userId },
-        data: { mode: "guide" },
+        data: { mode: "libre" },
       });
     }
 

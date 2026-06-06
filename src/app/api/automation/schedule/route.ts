@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
             userId: session.userId,
             actionPlanId: plan.id,
             task_type: "publish",
-            status: "waiting_dependency",
+            status: "planned",
             scheduled_at: new Date(),
             params_json: { dependencyTaskId: task.id }
           }

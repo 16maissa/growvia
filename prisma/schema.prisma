@@ -26,6 +26,8 @@ model User {
   agentTasks        AgentTask[]
   generatedContents GeneratedContent[]
   userGoals         UserGoal[]
+  courses           Course[]
+  agentMemories     AgentMemory[]
 }
 
 model Analysis {
@@ -155,8 +157,7 @@ model ActionPlan {
 
 enum AutoMode {
   libre
-  guide
-  semi
+  semi_auto @map("semi-auto")
   auto
 }
 
@@ -177,13 +178,12 @@ model AutomationPrefs {
 }
 
 enum TaskStatus {
+  planned
   pending
   running
   done
   failed
   skipped
-  waiting_dependency
-  approved
 }
 
 model AgentTask {
@@ -231,4 +231,55 @@ model UserGoal {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── Course Feature Models ────────────────────────────────────────────────
+
+model Course {
+  id                  String             @id @default(cuid())
+  userId              String
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  description         String?
+  pinecone_index_id   String?
+  telegram_bot_token  String?
+  telegram_chat_id    String?
+  telegram_bot_active Boolean            @default(false)
+  createdAt           DateTime           @default(now())
+  documents           CourseDocument[]
+  interactions        TelegramInteraction[]
+}
+
+model CourseDocument {
+  id                String   @id @default(cuid())
+  courseId          String
+  course            Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  filename          String
+  pinecone_namespace String?
+  indexed_at        DateTime?
+  status            String   @default("pending") // pending / indexing / indexed / failed
+  createdAt         DateTime @default(now())
+}
+
+model TelegramInteraction {
+  id           String   @id @default(cuid())
+  courseId     String
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  chat_id      String?
+  student_name String?
+  question     String
+  answer       String?
+  answered_at  DateTime?
+  createdAt    DateTime @default(now())
+}
+
+model AgentMemory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  value_json Json
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
 }

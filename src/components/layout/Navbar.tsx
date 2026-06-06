@@ -13,7 +13,7 @@ export function Navbar() {
   async function handleLogout() {
     setLoggingOut(true);
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/sign-in");
+    router.push("/");
     router.refresh();
   }
 

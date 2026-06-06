@@ -43,6 +43,31 @@ export default async function DashboardPage() {
 
   const lastAudit = user.audits[0] || null;
 
+  let activeCourse = null;
+  const course = await prisma.course.findFirst({
+    where: { userId: session.userId },
+    include: { interactions: true },
+    orderBy: { createdAt: "desc" }
+  });
+
+  if (course) {
+    const freq: Record<string, number> = {};
+    for (const int of course.interactions) {
+      const q = int.question.trim().toLowerCase();
+      freq[q] = (freq[q] || 0) + 1;
+    }
+    const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+    const topQ = sorted.length > 0 ? sorted[0][0] : null;
+
+    activeCourse = {
+      id: course.id,
+      name: course.name,
+      telegram_bot_active: course.telegram_bot_active,
+      studentQuestionsCount: course.interactions.length,
+      topQuestion: topQ,
+    };
+  }
+
   if (!lastAudit) {
     return (
       <div className="max-w-4xl mx-auto py-20 px-4 flex flex-col items-center text-center">
@@ -68,6 +93,7 @@ export default async function DashboardPage() {
       audit={lastAudit as any} 
       todayTasks={user.agentTasks} 
       pendingDrafts={user.generatedContents} 
+      activeCourse={activeCourse}
     />
   );
 }

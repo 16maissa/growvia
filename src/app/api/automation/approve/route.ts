@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     if (action === "approve") {
       await prisma.agentTask.update({
         where: { id: task_id },
-        data: { status: "approved", approved_at: new Date() }
+        data: { status: "done", approved_at: new Date() }
       });
       if (content) {
         await prisma.generatedContent.update({
