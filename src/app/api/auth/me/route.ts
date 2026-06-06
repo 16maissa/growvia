@@ -1,16 +1,29 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const session = await getSession();
+    console.log("[ME] request");
+
+    const session = await getSession(req);
+
+    console.log("[ME] session:", session);
+
     if (!session?.userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
+    // 🔥 FIX IMPORTANT: Prisma ID must be string safe
+    const userId = String(session.userId);
+
+    console.log("[ME] userId:", userId);
+
     const user = await prisma.user.findUnique({
-      where: { id: session.userId },
+      where: { id: userId },
       include: {
         userProfile: true,
         automationPrefs: true,
@@ -18,15 +31,24 @@ export async function GET() {
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      console.log("[ME] user not found in DB");
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
     }
 
-    // Return the user without the password
-    const { password, ...userWithoutPassword } = user;
+    const { password, ...safeUser } = user;
 
-    return NextResponse.json({ success: true, user: userWithoutPassword }, { status: 200 });
-  } catch (error: any) {
-    console.error("Get Me Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({
+      success: true,
+      user: safeUser,
+    });
+  } catch (err) {
+    console.error("[ME ERROR]", err);
+    return NextResponse.json(
+      { error: "Server error" },
+      { status: 500 }
+    );
   }
 }

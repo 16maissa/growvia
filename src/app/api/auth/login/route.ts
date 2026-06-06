@@ -2,51 +2,76 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { encrypt } from "@/lib/jwt";
-import { cookies } from "next/headers";
 
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json();
 
-    if (!email || !password) {
-      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-    }
+    console.log("[LOGIN] email:", email);
 
-    const user = await prisma.user.findUnique({ 
+    const user = await prisma.user.findUnique({
       where: { email },
-      include: {
-        userProfile: true
-      }
+      include: { userProfile: true },
     });
-    
-    if (!user || !user.password) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+
+    if (!user) {
+      console.log("[LOGIN] user not found");
+      return NextResponse.json(
+        { error: "Invalid credentials" },
+        { status: 401 }
+      );
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    if (!user.password) {
+      console.log("[LOGIN] missing password in DB");
+      return NextResponse.json(
+        { error: "Invalid credentials" },
+        { status: 401 }
+      );
     }
 
-    const payload = { 
-      userId: user.id, 
-      email: user.email, 
+    console.log("[LOGIN] user found:", user.id);
+
+    const ok = await bcrypt.compare(password, user.password);
+
+    console.log("[LOGIN] password valid:", ok);
+
+    if (!ok) {
+      return NextResponse.json(
+        { error: "Invalid credentials" },
+        { status: 401 }
+      );
+    }
+
+    const token = await encrypt({
+      userId: user.id,
+      email: user.email,
       plan: user.userProfile?.plan,
-      setup_done: user.userProfile?.setup_done 
-    };
-    
-    const sessionToken = await encrypt(payload);
-
-    const cookieStore = await cookies();
-    cookieStore.set("session", sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
     });
 
-    return NextResponse.json({ success: true, user: { id: user.id, name: user.name, email: user.email } }, { status: 200 });
-  } catch (error: any) {
-    console.error("Login Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    const res = NextResponse.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+    });
+
+    res.cookies.set("session", token, {
+      httpOnly: true,
+      path: "/",
+      sameSite: "lax",
+      secure: false, // VPS HTTP
+    });
+
+    console.log("[LOGIN] cookie SET OK");
+
+    return res;
+  } catch (err) {
+    console.error("[LOGIN ERROR]", err);
+    return NextResponse.json(
+      { error: "Server error" },
+      { status: 500 }
+    );
   }
 }

@@ -2,18 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { encrypt } from "@/lib/jwt";
-import { cookies } from "next/headers";
 
 export async function POST(req: NextRequest) {
   try {
+    console.log("🟢 REGISTER START");
+
     const { name, email, password } = await req.json();
+    console.log("📩 Data:", { name, email });
 
     if (!email || !password || !name) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
+
     if (existingUser) {
+      console.log("⚠️ User already exists");
       return NextResponse.json({ error: "User already exists" }, { status: 400 });
     }
 
@@ -42,25 +46,37 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const payload = { 
-      userId: user.id, 
-      email: user.email, 
+    console.log("👤 User created:", user.id);
+
+    const payload = {
+      userId: user.id,
+      email: user.email,
       plan: user.userProfile?.plan,
-      setup_done: user.userProfile?.setup_done 
+      setup_done: user.userProfile?.setup_done,
     };
-    
+
     const sessionToken = await encrypt(payload);
 
-    const cookieStore = await cookies();
-    cookieStore.set("session", sessionToken, {
+    const res = NextResponse.json({
+      success: true,
+      user: { id: user.id, name: user.name, email: user.email },
+    });
+
+    res.cookies.set("session", sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false, // 🔥 FIX VPS HTTP
+      sameSite: "lax",
       path: "/",
     });
 
-    return NextResponse.json({ success: true, user: { id: user.id, name: user.name, email: user.email } }, { status: 201 });
+    console.log("✅ REGISTER SUCCESS");
+
+    return res;
   } catch (error: any) {
-    console.error("Register Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("💥 Register Error:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error", details: error.message },
+      { status: 500 }
+    );
   }
 }
