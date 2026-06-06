@@ -4,6 +4,13 @@ const secretKey =
   process.env.JWT_SECRET || "dev-secret-change-me";
 const key = new TextEncoder().encode(secretKey);
 
+export interface SessionPayload {
+  userId: string;
+  email?: string;
+  exp?: number;
+  iat?: number;
+}
+
 export async function encrypt(payload: any) {
   console.log("[JWT] encrypt payload:", payload);
 
@@ -14,11 +21,10 @@ export async function encrypt(payload: any) {
     .sign(key);
 }
 
-export async function decrypt(token: string) {
+export async function decrypt(token: string): Promise<SessionPayload | null> {
   try {
     const { payload } = await jwtVerify(token, key);
-    console.log("[JWT] decrypt OK:", payload);
-    return payload;
+    return payload as unknown as SessionPayload;
   } catch (err) {
     console.log("[JWT] decrypt FAILED");
     return null;
