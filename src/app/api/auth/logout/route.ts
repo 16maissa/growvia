@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 
 export async function POST() {
-  const cookieStore = await cookies();
-  cookieStore.delete("session");
-  return NextResponse.json({ success: true }, { status: 200 });
+  const res = NextResponse.redirect(new URL("/sign-in", process.env.NEXT_PUBLIC_APP_URL || "https://growvia.network"));
+  res.cookies.delete("session");
+  return res;
 }

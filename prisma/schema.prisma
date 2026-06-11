@@ -28,6 +28,7 @@ model User {
   userGoals         UserGoal[]
   courses           Course[]
   agentMemories     AgentMemory[]
+  isAdmin           Boolean            @default(false)
 }
 
 model Analysis {

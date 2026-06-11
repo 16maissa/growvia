@@ -35,7 +35,7 @@ export default function SignInPage() {
         throw new Error(data.error || "An error occurred");
       }
 
-      router.push("/dashboard");
+      router.push(data.isAdmin ? "/admin" : "/dashboard");
       router.refresh();
     } catch (err: any) {
       setError(err.message);

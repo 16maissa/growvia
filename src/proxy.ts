@@ -5,24 +5,22 @@ import { decrypt } from '@/lib/jwt';
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  // Public routes that don't need auth
   const isPublicRoute =
     path === '/' ||
     path === '/sign-in' ||
     path === '/sign-up' ||
     path.startsWith('/api/auth') ||
     path.startsWith('/api/orchestrator/run') ||
-    path.startsWith('/api/webhooks');
+    path.startsWith('/api/webhooks') ||
+    path.startsWith('/api/telegram-webhook') ||
+    path.startsWith('/api/telegram-send');
 
   const session = request.cookies.get('session')?.value;
   let parsedSession = null;
-
   if (session) {
     try {
       parsedSession = await decrypt(session);
-    } catch (e) {
-      // Invalid session — treat as unauthenticated
-    }
+    } catch (e) {}
   }
 
   if (!isPublicRoute && !parsedSession?.userId) {
@@ -32,7 +30,6 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/sign-in', request.nextUrl));
   }
 
-  // Already authenticated — don't show auth pages
   if ((path === '/sign-in' || path === '/sign-up') && parsedSession?.userId) {
     return NextResponse.redirect(new URL('/dashboard', request.nextUrl));
   }

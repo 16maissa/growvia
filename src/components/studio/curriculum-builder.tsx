@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import {
   GraduationCap,
   Loader2,
@@ -24,14 +24,16 @@ const DIFFICULTY_OPTIONS = [
 ];
 
 export default function CurriculumBuilder({ availableDocs }: { availableDocs: Doc[] }) {
-  const [selectedFiles, setSelectedFiles]   = useState<string[]>([]);
-  const [age, setAge]                       = useState<number>(14);
-  const [difficulty, setDifficulty]         = useState<string>("medium");
-  const [isLoading, setIsLoading]           = useState(false);
-  const [error, setError]                   = useState<string | null>(null);
-  const [htmlBlob, setHtmlBlob]             = useState<string | null>(null);   // object URL
-  const [htmlText, setHtmlText]             = useState<string | null>(null);   // raw HTML string
-  const [fullscreen, setFullscreen]         = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [age, setAge]                     = useState<number>(14);
+  const [difficulty, setDifficulty]       = useState<string>("medium");
+  const [isLoading, setIsLoading]         = useState(false);
+  const [error, setError]                 = useState<string | null>(null);
+  const [htmlBlob, setHtmlBlob]           = useState<string | null>(null);
+  const [htmlText, setHtmlText]           = useState<string | null>(null);
+  const [fullscreen, setFullscreen]       = useState(false);
+  const [sending, setSending]             = useState(false);
+  const [sent, setSent]                   = useState(false);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -51,6 +53,7 @@ export default function CurriculumBuilder({ availableDocs }: { availableDocs: Do
     setError(null);
     setHtmlBlob(null);
     setHtmlText(null);
+    setSent(false);
 
     try {
       const res = await fetch("/api/curriculum/generate", {
@@ -64,11 +67,8 @@ export default function CurriculumBuilder({ availableDocs }: { availableDocs: Do
         throw new Error((data as any).error || `Server error ${res.status}`);
       }
 
-      // Response is a binary HTML file
-      const blob = await res.blob();
-      const text = await blob.text();
-      const objectUrl = URL.createObjectURL(new Blob([text], { type: "text/html" }));
-      setHtmlBlob(objectUrl);
+      const text = await res.text();
+      setHtmlBlob(text);
       setHtmlText(text);
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred.");
@@ -85,9 +85,39 @@ export default function CurriculumBuilder({ availableDocs }: { availableDocs: Do
     a.click();
   };
 
+  const handleSendToTelegram = async () => {
+    if (!htmlText) return;
+    setSending(true);
+    setSent(false);
+    try {
+      const res = await fetch("/api/telegram-send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer growvia-secret-2025`,
+        },
+        body: JSON.stringify({
+          type: "html_file",
+          chat_id: -1003767100563,
+          content: {
+            html_content: htmlText,
+            filename: "Training_Course.html",
+            caption: "📚 Nouveau cours généré !",
+          },
+        }),
+      });
+      if (res.ok) setSent(true);
+    } catch {
+      setSent(false);
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12">
-      {/* ── Config Card ───────────────────────────────────────────────── */}
+
+      {/* ── Config Card ── */}
       <div className="bg-card border border-border rounded-2xl shadow-sm p-6 md:p-8 space-y-8">
 
         {/* Header */}
@@ -105,16 +135,13 @@ export default function CurriculumBuilder({ availableDocs }: { availableDocs: Do
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-          {/* ── Left: PDF Selection ─────────────────────────────────── */}
+          {/* ── Left: PDF Selection ── */}
           <div className="lg:col-span-2 space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                 <FileText className="w-4 h-4" /> Source Documents
               </label>
-              <button
-                onClick={selectAll}
-                className="text-xs text-violet-500 hover:underline font-semibold"
-              >
+              <button onClick={selectAll} className="text-xs text-violet-500 hover:underline font-semibold">
                 Select all
               </button>
             </div>
@@ -167,7 +194,7 @@ export default function CurriculumBuilder({ availableDocs }: { availableDocs: Do
             </p>
           </div>
 
-          {/* ── Right: Parameters ──────────────────────────────────── */}
+          {/* ── Right: Parameters ── */}
           <div className="space-y-6">
 
             {/* Age */}
@@ -177,10 +204,7 @@ export default function CurriculumBuilder({ availableDocs }: { availableDocs: Do
               </label>
               <div className="flex items-center gap-3">
                 <input
-                  type="range"
-                  min={6}
-                  max={18}
-                  value={age}
+                  type="range" min={6} max={18} value={age}
                   onChange={e => setAge(Number(e.target.value))}
                   className="flex-1 accent-violet-500 cursor-pointer"
                 />
@@ -253,7 +277,7 @@ export default function CurriculumBuilder({ availableDocs }: { availableDocs: Do
         )}
       </div>
 
-      {/* ── Preview Panel ─────────────────────────────────────────────── */}
+      {/* ── Preview Panel ── */}
       {htmlBlob && (
         <div className={cn(
           "bg-card border border-border rounded-2xl shadow-sm overflow-hidden transition-all",
@@ -274,6 +298,14 @@ export default function CurriculumBuilder({ availableDocs }: { availableDocs: Do
                 Download HTML
               </button>
               <button
+                onClick={handleSendToTelegram}
+                disabled={sending}
+                className="flex items-center gap-2 bg-green-500/80 hover:bg-green-500 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+              >
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {sending ? "Envoi…" : sent ? "✅ Envoyé !" : "📤 Envoyer au groupe"}
+              </button>
+              <button
                 onClick={() => setFullscreen(v => !v)}
                 className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
                 title={fullscreen ? "Exit fullscreen" : "Fullscreen"}
@@ -286,13 +318,13 @@ export default function CurriculumBuilder({ availableDocs }: { availableDocs: Do
           {/* Iframe */}
           <iframe
             ref={iframeRef}
-            src={htmlBlob}
+            srcDoc={htmlBlob}
             title="Training Course Preview"
             className={cn(
               "w-full bg-white",
               fullscreen ? "h-[calc(100%-56px)]" : "h-[70vh]"
             )}
-            sandbox="allow-same-origin allow-scripts"
+            sandbox="allow-scripts"
           />
         </div>
       )}

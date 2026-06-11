@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { BrainCircuit, Loader2, Sparkles, AlertCircle, CheckCircle2, ChevronRight } from "lucide-react";
+import { BrainCircuit, Loader2, Sparkles, AlertCircle, CheckCircle2, ChevronRight, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Doc = { id: string; fileName: string };
@@ -134,6 +134,9 @@ export default function QuizStudio({ availableDocs }: { availableDocs: Doc[] }) 
   const [choicesCount, setChoicesCount] = useState(4);
   const [showAnswers, setShowAnswers] = useState(false);
 
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [questions, setQuestions] = useState<Question[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -157,6 +160,8 @@ export default function QuizStudio({ availableDocs }: { availableDocs: Doc[] }) 
     setError(null);
     setQuestions(null);
     setShowAnswers(false);
+    setSent(false);
+    setSendError(null);
 
     try {
       const res = await fetch("/api/generate-quiz", {
@@ -171,6 +176,42 @@ export default function QuizStudio({ availableDocs }: { availableDocs: Doc[] }) 
       setError(err.message || "An unexpected error occurred.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+
+  const handleSendToTelegram = async () => {
+    if (!questions || questions.length === 0) return;
+    setSending(true);
+    setSent(false);
+    setSendError(null);
+    try {
+      for (const q of questions) {
+        const correctIndex = q.options.findIndex(o => o === q.correctAnswer);
+        const res = await fetch("/api/telegram-send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer growvia-secret-2025`,
+          },
+          body: JSON.stringify({
+            type: "quiz",
+            chat_id: -1003767100563,
+            content: {
+              question: q.questionText,
+              options: q.options,
+              correct_index: correctIndex >= 0 ? correctIndex : 0,
+            },
+          }),
+        });
+        if (!res.ok) throw new Error(`Failed on question ${q.id}`);
+        await new Promise(r => setTimeout(r, 500));
+      }
+      setSent(true);
+    } catch (err: any) {
+      setSendError(err.message || "Telegram send failed");
+    } finally {
+      setSending(false);
     }
   };
 
@@ -304,8 +345,22 @@ export default function QuizStudio({ availableDocs }: { availableDocs: Doc[] }) 
                 </div>
               </div>
               <span className="text-white/80 text-sm font-semibold">{questions.length} Questions</span>
+              <button
+                onClick={handleSendToTelegram}
+                disabled={sending}
+                className="flex items-center gap-2 bg-white/20 hover:bg-white/30 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors ml-2"
+              >
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {sending ? "Envoi…" : sent ? "✅ Envoyé !" : "📤 Envoyer au groupe"}
+              </button>
             </div>
           </div>
+          {sendError && (
+            <div className="mt-2 p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-sm flex gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              {sendError}
+            </div>
+          )}
 
           {/* Toggle answer key */}
           <div className="flex justify-end">
