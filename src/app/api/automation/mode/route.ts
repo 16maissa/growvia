@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { encrypt } from "@/lib/jwt";
+import { cookies } from "next/headers";
 
 export async function POST(req: NextRequest) {
   try {
@@ -89,12 +91,30 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    // Refresh JWT token with updated plan
+    const updatedProfile = await prisma.userProfile.findUnique({ where: { userId } });
+    const updatedPrefs = await prisma.automationPrefs.findUnique({ where: { userId } });
+    const updatedUser = await prisma.user.findUnique({ where: { id: userId } });
+    const newToken = await encrypt({
+      userId,
+      email: updatedUser?.email,
+      plan: updatedProfile?.plan ?? "libre",
+      setup_done: updatedProfile?.setup_done ?? false,
+    });
+    const response = NextResponse.json({
       success: true,
       userId,
-      plan,
-      mode,
+      plan: updatedProfile?.plan,
+      mode: updatedPrefs?.mode,
     });
+    response.cookies.set("session", newToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+    });
+    return response;
   } catch (error: any) {
     console.error("[MODE ERROR]", error);
 

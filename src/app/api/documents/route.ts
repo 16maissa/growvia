@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
 
 export async function GET() {
   try {
+    const session = await getSession();
+    const userId = (session as any)?.userId || null;
+
     const documents = await prisma.uploadedDocument.findMany({
+      where: { userId: userId },
       distinct: ["fileName"],
       orderBy: { createdAt: "desc" },
     });

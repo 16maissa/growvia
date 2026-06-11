@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+
+export const maxDuration = 60;
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getSession();
+    const userId = (session as any)?.userId || null;
+
     const formData = await req.formData();
     
     // n8n expects binary field named 'data'
@@ -17,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     // Prevent duplicate file uploads
     const existingDoc = await prisma.uploadedDocument.findFirst({
-      where: { fileName: file.name }
+      where: { fileName: file.name, userId: userId }
     });
 
     if (existingDoc) {
@@ -86,6 +92,7 @@ export async function POST(req: NextRequest) {
     const document = await prisma.uploadedDocument.create({
       data: {
         fileName: file.name,
+        userId: userId,
       },
     });
 
@@ -93,7 +100,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: n8nData.message || "File processed successfully",
-      file: n8nData.file || file.name,
+      file: file.name,
       documentId: document.id
     }, { status: 200 });
 
