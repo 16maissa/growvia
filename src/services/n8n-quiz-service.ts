@@ -43,7 +43,7 @@ async function getEmbedding(text: string): Promise<number[] | null> {
   }
 }
 
-async function fetchPineconeContext(fileNames: string[], promptText: string): Promise<string> {
+async function fetchPineconeContext(fileNames: string[], promptText: string, userId: string): Promise<string> {
   try {
     const PINECONE_KEY = process.env.PINECONE_API_KEY;
     if (!PINECONE_KEY) {
@@ -62,9 +62,11 @@ async function fetchPineconeContext(fileNames: string[], promptText: string): Pr
     const index = pinecone.index(indexName);
 
     const queryOptions: any = { vector, topK: 15, includeMetadata: true };
+    const filterConditions: any[] = [{ userId: { "$eq": userId } }];
     if (fileNames.length > 0) {
-      queryOptions.filter = { fileName: { "$in": fileNames } };
+      filterConditions.push({ fileName: { "$in": fileNames } });
     }
+    queryOptions.filter = filterConditions.length === 1 ? filterConditions[0] : { "$and": filterConditions };
 
     const results = await index.query(queryOptions);
     const context = (results.matches || [])
@@ -135,13 +137,14 @@ async function callLLMDirectly(
   easyCount: number,
   mediumCount: number,
   hardCount: number,
-  choicesCount: number
+  choicesCount: number,
+  userId: string
 ): Promise<QuizQuestion[]> {
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
   if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY missing");
 
   console.log("[Fallback] Fetching Pinecone context...");
-  const context = await fetchPineconeContext(fileNames, fileNames.join(" "));
+  const context = await fetchPineconeContext(fileNames, fileNames.join(" "), userId);
   const fullPrompt = buildFullPrompt(fileNames, totalQuestions, easyCount, mediumCount, hardCount, choicesCount, context);
 
   const models = [
@@ -234,7 +237,8 @@ export async function generateQuizFromN8n(
   easyCount: number,
   mediumCount: number,
   hardCount: number,
-  choicesCount: number
+  choicesCount: number,
+  userId: string
 ): Promise<QuizQuestion[]> {
   const webhookUrl = process.env.N8N_QUIZ_WEBHOOK_URL || "http://localhost:5678/webhook/generate-quiz";
   const fileNamesString = selectedFiles.map(f => `[${f}]`).join(", ");
@@ -284,5 +288,5 @@ export async function generateQuizFromN8n(
   }
 
   console.log("=== [Quiz] Activating fallback (Pinecone + LLM) ===");
-  return callLLMDirectly(selectedFiles, totalQuestions, easyCount, mediumCount, hardCount, choicesCount);
+  return callLLMDirectly(selectedFiles, totalQuestions, easyCount, mediumCount, hardCount, choicesCount, userId);
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withWebhookLock } from "@/lib/webhook-lock";
 import { Pinecone } from "@pinecone-database/pinecone";
+import { getSession } from "@/lib/auth";
 
 export const maxDuration = 300;
 
@@ -26,7 +27,7 @@ async function getEmbedding(text: string): Promise<number[] | null> {
 }
 
 // ── Pinecone context fetch ────────────────────────────────────────────────────
-async function fetchPineconeContext(fileNames: string[]): Promise<string> {
+async function fetchPineconeContext(fileNames: string[], userId: string): Promise<string> {
   try {
     const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY! });
     const index = pinecone.index(process.env.PINECONE_INDEX_NAME || "school-knowledge");
@@ -36,9 +37,11 @@ async function fetchPineconeContext(fileNames: string[]): Promise<string> {
     if (!vector) return "";
 
     const queryOptions: any = { vector, topK: 20, includeMetadata: true };
+    const filterConditions: any[] = [{ userId: { "$eq": userId } }];
     if (fileNames.length > 0) {
-      queryOptions.filter = { fileName: { "$in": fileNames } };
+      filterConditions.push({ fileName: { "$in": fileNames } });
     }
+    queryOptions.filter = filterConditions.length === 1 ? filterConditions[0] : { "$and": filterConditions };
 
     const results = await index.query(queryOptions);
     const context = (results.matches || [])
@@ -157,6 +160,11 @@ CRITICAL: Return ONLY the raw HTML. Start with <!DOCTYPE html> or <html>. No mar
 // ── Main handler ──────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
+    const session = await getSession();
+    const userId = (session as any)?.userId;
+    if (!userId) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
     const body = await req.json();
     const { files, age, difficulty } = body;
 
@@ -225,7 +233,7 @@ export async function POST(req: NextRequest) {
     // ── n8n failed → Pinecone + LLM fallback ──
     if (!htmlResult) {
       console.log("=== [Curriculum] Activating fallback (Pinecone + LLM) ===");
-      const context = await fetchPineconeContext(files);
+      const context = await fetchPineconeContext(files, userId);
       htmlResult = await generateCurriculumWithLLM(files, Number(age), difficulty, context);
       console.log("=== [Curriculum] ✅ Fallback success ===");
     }

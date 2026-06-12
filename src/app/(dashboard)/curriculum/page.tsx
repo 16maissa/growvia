@@ -1,8 +1,17 @@
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import CurriculumBuilder from "@/components/studio/curriculum-builder";
 
+export const dynamic = "force-dynamic";
+
 export default async function CurriculumPage() {
+  const session = await getSession();
+  if (!session?.userId) redirect("/sign-in");
+
   const uploadedDocs = await prisma.uploadedDocument.findMany({
+    where: { userId: session.userId },
+    distinct: ["fileName"],
     orderBy: { createdAt: "desc" },
     select: { id: true, fileName: true },
   });

@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
     n8nFormData.append("data", blob, file.name); // IMPORTANT: passed explicitly so n8n knows it's a PDF
     n8nFormData.append("fileName", file.name);
     n8nFormData.append("name", file.name);
+    n8nFormData.append("userId", userId || "");
 
     const webhookUrl = process.env.N8N_PDF_UPLOAD_WEBHOOK_URL || "http://localhost:5678/webhook/upload-pdf";
     

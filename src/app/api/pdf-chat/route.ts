@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Pinecone } from "@pinecone-database/pinecone";
+import { getSession } from "@/lib/auth";
 
 function isCasualMessage(text: string): boolean {
   return /^(hi|hello|hey|bonjour|salut|bonsoir|merci|thank|thanks|ok|okay|bye|au revoir|ciao|sup|yo|hola|ça va|ca va|comment tu vas|comment vas-tu)\b/i.test(text.trim());
@@ -34,7 +35,7 @@ async function getEmbedding(text: string): Promise<number[] | null> {
   } catch { return null; }
 }
 
-async function searchPinecone(question: string, filterFileName?: string): Promise<string> {
+async function searchPinecone(question: string, userId: string, filterFileName?: string): Promise<string> {
   try {
     const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY! });
     const index = pinecone.index(process.env.PINECONE_INDEX_NAME || "school-knowledge");
@@ -42,9 +43,11 @@ async function searchPinecone(question: string, filterFileName?: string): Promis
     if (!vector) return "";
 
     const queryOptions: any = { vector, topK: 10, includeMetadata: true };
+    const filterConditions: any[] = [{ userId: { "$eq": userId } }];
     if (filterFileName) {
-      queryOptions.filter = { fileName: { "$in": [filterFileName] } };
+      filterConditions.push({ fileName: { "$in": [filterFileName] } });
     }
+    queryOptions.filter = filterConditions.length === 1 ? filterConditions[0] : { "$and": filterConditions };
 
     const results = await index.query(queryOptions);
     const context = (results.matches || [])
@@ -134,6 +137,11 @@ export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getSession();
+    const userId = (session as any)?.userId;
+    if (!userId) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
     const body = await req.json();
     const { question } = body;
 
@@ -180,7 +188,7 @@ export async function POST(req: NextRequest) {
       // YES to "search all documents"
       if (previousAnswer.includes("__ask_global")) {
         console.log("[Chat] YES → Global Pinecone search");
-        const context = await searchPinecone(originalQuestion);
+        const context = await searchPinecone(originalQuestion, userId);
         if (context) {
           const prompt = buildRagPrompt(originalQuestion, context, "rag");
           answer = await askLLM(prompt);
@@ -255,7 +263,7 @@ export async function POST(req: NextRequest) {
     // n8n failed → Pinecone direct fallback
     if (!n8nOk) {
       console.log("[Chat] Fallback → Pinecone + LLM");
-      const context = await searchPinecone(trimmedQuestion);
+      const context = await searchPinecone(trimmedQuestion, userId);
 
       if (context) {
         const prompt = buildRagPrompt(trimmedQuestion, context, "rag");

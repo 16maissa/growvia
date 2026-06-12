@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateQuizFromN8n } from "@/services/n8n-quiz-service";
+import { getSession } from "@/lib/auth";
 
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getSession();
+    const userId = (session as any)?.userId;
+    if (!userId) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
     const body = await req.json();
     const { selectedFiles, totalQuestions, easyCount, mediumCount, hardCount, choicesCount } = body;
 
@@ -22,7 +28,8 @@ export async function POST(req: NextRequest) {
       easyCount,
       mediumCount,
       hardCount,
-      choicesCount
+      choicesCount,
+      userId
     );
 
     return NextResponse.json({ success: true, questions }, { status: 200 });
